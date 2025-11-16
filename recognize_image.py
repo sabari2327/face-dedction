@@ -11,6 +11,7 @@ import os
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=True, help="input image path")
+ap.add_argument("-o", "--output", required=False, help="optional output image path to save result")
 args = vars(ap.parse_args())
 
 # load our serialized face detector from disk
@@ -24,7 +25,12 @@ print("Loading Face Recognizer...")
 embedder = cv2.dnn.readNetFromTorch('openface_nn4.small2.v1.t7')
 
 # load the actual face recognition model along with the label encoder
-recognizer = pickle.loads(open('output/recognizer.pickle', "rb").read())
+# prefer the model file created by `train_model.py` ("output/recognizer");
+# fall back to the older "output/recognizer.pickle" if present
+if os.path.exists('output/recognizer'):
+	recognizer = pickle.loads(open('output/recognizer', "rb").read())
+else:
+	recognizer = pickle.loads(open('output/recognizer.pickle', "rb").read())
 le = pickle.loads(open('output/le.pickle', "rb").read())
 
 # load the image, resize it to have a width of 600 pixels (while maintaining the aspect ratio), and then grab the image dimensions
@@ -80,6 +86,12 @@ for i in range(0, detections.shape[2]):
 		cv2.putText(image, text, (startX, y),
 			cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
 
-# show the output image
-cv2.imshow("Image", image)
-cv2.waitKey(0)
+# show or save the output image
+if args.get("output"):
+	out_path = args.get("output")
+	os.makedirs(os.path.dirname(out_path), exist_ok=True)
+	cv2.imwrite(out_path, image)
+	print(f"Saved result to {out_path}")
+else:
+	cv2.imshow("Image", image)
+	cv2.waitKey(0)
