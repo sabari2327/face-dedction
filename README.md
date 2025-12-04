@@ -36,8 +36,10 @@ face-dedction/
 ├── train_model.py         # Step 2: train SVM classifier
 ├── recognize_image.py     # Step 3a: recognize faces in a static image
 ├── recognize_video.py     # Step 3b: recognize faces in live video
+├── match_faces_live.py    # Interactive: upload image → match in live camera
 ├── run_live.bat           # One-click launcher: open webcam
 ├── run_pipeline.bat       # One-click launcher: extract → train → demo
+├── run_match_faces.bat    # One-click launcher: upload image → match faces
 ├── create_shortcuts.ps1   # PowerShell script to create Desktop shortcuts
 ├── requirements.txt       # Python dependencies
 └── README.md              # This file
@@ -47,15 +49,22 @@ face-dedction/
 
 ### Windows (Easiest)
 
-1. **Live Webcam Demo:**
+1. **Interactive Face Matcher (NEW!):**
+   - Double-click `run_match_faces.bat`
+   - Upload an image (or use default `images/openface.jpg`)
+   - Enter the name of the person in the image
+   - Watch the camera in real-time as it highlights matching faces
+   - Press `q` to quit
+
+2. **Live Webcam Demo:**
    - Double-click `run_live.bat` to start the webcam and see real-time face recognition
    - Press `q` in the preview window to quit
 
-2. **Full Pipeline Demo:**
+3. **Full Pipeline Demo:**
    - Double-click `run_pipeline.bat` to extract embeddings, train the model, and run recognition on a sample image
    - Results saved to `output/result.jpg`
 
-3. **Create Desktop Shortcuts** (optional):
+4. **Create Desktop Shortcuts** (optional):
    - Double-click `create_shortcuts.ps1` (or right-click → Run with PowerShell)
    - Creates "Run Live" and "Run Pipeline" shortcuts on your Desktop for even quicker access
 
@@ -83,6 +92,33 @@ face-dedction/
    ```
 
 ## Usage
+
+### Interactive Face Matcher (Upload + Live Match)
+
+Upload an image of a specific person, then use the camera to find matching faces in real-time.
+
+```powershell
+# Interactive mode (will prompt for image and name)
+python match_faces_live.py
+
+# Or with command-line arguments
+python match_faces_live.py --image images\openface.jpg --name "John" --threshold 0.6
+```
+
+**How it works:**
+1. You provide an image containing the face you want to match
+2. The app extracts the face embedding from that image
+3. Camera starts and displays all detected faces
+4. Faces matching the uploaded image are highlighted in **green**
+5. Non-matching faces are highlighted in **red** with distance score
+6. Press `q` to quit, `s` to save snapshots
+
+**Options:**
+- `--image` — Path to the reference image (default: asks interactively)
+- `--name` — Name of the person (default: asks interactively)
+- `--threshold` — Matching distance threshold, 0–1 (default: 0.6, lower = stricter)
+- `--confidence` — Face detection confidence (default: 0.5)
+- `--src` — Camera index or video file (default: 0 for webcam)
 
 ### Full Pipeline (Train & Recognize)
 
@@ -275,16 +311,18 @@ Check `LICENSE` for details.
 | Install deps | `python -m pip install -r requirements.txt` |
 | Extract embeddings | `python extract_embeddings.py` |
 | Train model | `python train_model.py` |
+| Match + live cam | `python match_faces_live.py` |
 | Recognize in image | `python recognize_image.py --image images\openface.jpg` |
 | Open webcam | `python recognize_video.py` |
 | Save image result | `python recognize_image.py --image images\openface.jpg --output output\result.jpg` |
 | Save video result | `python recognize_video.py --no-display --output output\video.avi` |
+| One-click match faces | Double-click `run_match_faces.bat` |
 | One-click webcam | Double-click `run_live.bat` |
 | One-click full demo | Double-click `run_pipeline.bat` |
 | Create Desktop shortcuts | `powershell -NoProfile -ExecutionPolicy Bypass -File create_shortcuts.ps1 -Force` |
 
 ---
 
-**Last Updated:** November 2025
+**Last Updated:** December 2025
 
 
