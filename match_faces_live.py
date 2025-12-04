@@ -1,31 +1,30 @@
 """
 Interactive face matching: Upload an image, then match faces in live camera feed.
+No pre-training required - works with any image from your local storage.
 """
 
 import os
 import cv2
-import pickle
 import argparse
 import numpy as np
-from imutils import paths
 from pathlib import Path
 
 
 def load_models():
-    """Load the trained face detector, embedder, and recognizer models."""
+    """Load the face detector and embedder models."""
     prototxt_path = os.path.join('face_detection_model', 'deploy.prototxt')
     weights_path = os.path.join('face_detection_model', 'res10_300x300_ssd_iter_140000.caffemodel')
-    embeddings_path = os.path.join('output', 'openface_nn4.small2.v1.t7')
+    embeddings_path = 'openface_nn4.small2.v1.t7'
     
     if not os.path.exists(prototxt_path):
         print(f"ERROR: Face detector prototxt not found at {prototxt_path}")
-        return None, None, None, None
+        return None, None
     if not os.path.exists(weights_path):
         print(f"ERROR: Face detector weights not found at {weights_path}")
-        return None, None, None, None
+        return None, None
     if not os.path.exists(embeddings_path):
         print(f"ERROR: Embeddings model not found at {embeddings_path}")
-        return None, None, None, None
+        return None, None
     
     # Load face detector
     net = cv2.dnn.readNetFromCaffe(prototxt_path, weights_path)
@@ -33,22 +32,7 @@ def load_models():
     # Load face embedder
     embedder = cv2.dnn.readNetFromTorch(embeddings_path)
     
-    # Load recognizer and label encoder
-    recognizer_path = os.path.join('output', 'recognizer')
-    le_path = os.path.join('output', 'le.pickle')
-    
-    if not os.path.exists(recognizer_path):
-        print(f"ERROR: Trained recognizer not found at {recognizer_path}")
-        print("Please run: python train_model.py")
-        return None, None, None, None
-    if not os.path.exists(le_path):
-        print(f"ERROR: Label encoder not found at {le_path}")
-        return None, None, None, None
-    
-    recognizer = pickle.load(open(recognizer_path, 'rb'))
-    le = pickle.load(open(le_path, 'rb'))
-    
-    return net, embedder, recognizer, le
+    return net, embedder
 
 
 def get_face_embedding(frame, net, embedder, confidence=0.5):
@@ -171,7 +155,7 @@ def euclidean_distance(vec_a, vec_b):
     return np.linalg.norm(vec_a - vec_b)
 
 
-def run_live_matching(target_embedding, target_name, net, embedder, recognizer, le, 
+def run_live_matching(target_embedding, target_name, net, embedder, 
                       confidence=0.5, threshold=0.6, camera_src=0):
     """
     Run live camera feed and match faces against target embedding.
@@ -181,8 +165,6 @@ def run_live_matching(target_embedding, target_name, net, embedder, recognizer, 
         target_name: Name of the person to match
         net: Face detection network
         embedder: Face embedding network
-        recognizer: Trained SVM recognizer (for optional classification)
-        le: Label encoder (for optional classification)
         confidence: Detection confidence threshold (0-1)
         threshold: Distance threshold for matching (lower = stricter)
         camera_src: Camera source (0 for default webcam)
@@ -192,6 +174,7 @@ def run_live_matching(target_embedding, target_name, net, embedder, recognizer, 
     print("="*60)
     print(f"\nMatching against: {target_name}")
     print(f"Distance threshold: {threshold} (lower = stricter matching)")
+    print("Matching percentage: Shows how similar detected faces are")
     print("\nStarting camera...")
     print("Controls:")
     print("  'q' - Quit")
@@ -228,6 +211,10 @@ def run_live_matching(target_embedding, target_name, net, embedder, recognizer, 
                 # Calculate distance to target embedding
                 distance = euclidean_distance(target_embedding, embedding)
                 
+                # Calculate matching percentage (inverse of normalized distance)
+                # Distance ranges from ~0.3 (very similar) to ~1.5 (very different)
+                match_percentage = max(0, min(100, (1.0 - distance) * 100))
+                
                 # Determine if it's a match
                 is_match = distance < threshold
                 
@@ -235,12 +222,12 @@ def run_live_matching(target_embedding, target_name, net, embedder, recognizer, 
                 color = (0, 255, 0) if is_match else (0, 0, 255)  # Green for match, Red for no match
                 cv2.rectangle(frame, (startX, startY), (endX, endY), color, 2)
                 
-                # Draw label
+                # Draw label with matching percentage
                 if is_match:
-                    label = f"{target_name} (Match!)"
+                    label = f"{target_name} - {match_percentage:.1f}% MATCH"
                     match_count += 1
                 else:
-                    label = f"No Match (dist: {distance:.2f})"
+                    label = f"{match_percentage:.1f}% Match (dist: {distance:.2f})"
                 
                 cv2.putText(frame, label, (startX, startY - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
@@ -289,10 +276,12 @@ def main():
     print("\n" + "="*60)
     print("INTERACTIVE FACE MATCHER")
     print("="*60)
+    print("\nNo pre-training needed!")
+    print("Upload any image from your computer and match faces in real-time.")
     
     # Load models
     print("\nLoading models...")
-    net, embedder, recognizer, le = load_models()
+    net, embedder = load_models()
     if net is None:
         print("\nERROR: Failed to load models. Exiting.")
         return
@@ -313,10 +302,13 @@ def main():
     
     # Show uploaded image with detected face
     if output_image is not None:
-        cv2.imshow("Uploaded Image - Face Detected", output_image)
-        print("\nShowing uploaded image. Press any key to continue...")
-        cv2.waitKey(0)
-        cv2.destroyWindow("Uploaded Image - Face Detected")
+        try:
+            cv2.imshow("Uploaded Image - Face Detected", output_image)
+            print("\nShowing uploaded image. Press any key to continue...")
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        except:
+            print("\nFace detected in uploaded image. Proceeding to camera...")
     
     # Get name
     if args.name:
@@ -336,7 +328,7 @@ def main():
     
     # Run live matching
     input("\nPress Enter to start camera...")
-    run_live_matching(target_embedding, target_name, net, embedder, recognizer, le,
+    run_live_matching(target_embedding, target_name, net, embedder,
                       args.confidence, args.threshold, camera_src)
     
     print("\n" + "="*60)
